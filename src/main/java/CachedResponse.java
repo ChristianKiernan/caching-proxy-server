@@ -1,4 +1,8 @@
-package PACKAGE_NAME;
+import java.util.List;
+import java.util.Map;
 
-public class CachedResponse {
-}
+public record CachedResponse(
+    int statusCode,
+    Map<String, List<String>> headers,
+    byte[] body
+    ) {}
