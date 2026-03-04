@@ -45,32 +45,42 @@ public class ProxyCliCommand implements Runnable {
      */
     @Override
     public void run() {
-        // 1) Clear-cache mode
         if (clearCache) {
-            if (cacheFile == null) {
-                System.err.println("Error: --cache-file is required to use --clear-cache.");
-                return;
-            }
-            if (!Files.exists(cacheFile)) {
-                System.out.println("Cache already empty.");
-                return;
-            }
-            try {
-                Files.delete(cacheFile);
-                System.out.println("Cache cleared.");
-            } catch (IOException e) {
-                System.err.println("Error clearing cache: " + e.getMessage());
-            }
+            runClearCache();
             return;
         }
-        // 2) Run mode validation
         if (port == null || origin == null) {
             System.err.println("Error: --port and --origin are required unless --clear-cache is used.");
             System.err.println("Try: caching-proxy --help");
             return;
         }
+        ProxyConfig config = new ProxyConfig(this.port, this.origin, 4, Duration.ofSeconds(10), cacheFile);
+        try {
+            ProxyServer server = new ProxyServer(config, loadCacheStore());
+            server.start();
+        } catch (IOException e) {
+            System.err.println("Error starting server: " + e.getMessage());
+        }
+    }
 
-        // 3) Load cache from file (if provided), then start server
+    private void runClearCache() {
+        if (cacheFile == null) {
+            System.err.println("Error: --cache-file is required to use --clear-cache.");
+            return;
+        }
+        if (!Files.exists(cacheFile)) {
+            System.out.println("Cache already empty.");
+            return;
+        }
+        try {
+            Files.delete(cacheFile);
+            System.out.println("Cache cleared.");
+        } catch (IOException e) {
+            System.err.println("Error clearing cache: " + e.getMessage());
+        }
+    }
+
+    private CacheStore loadCacheStore() {
         CacheStore cacheStore;
         if (cacheFile != null) {
             try {
@@ -82,13 +92,6 @@ public class ProxyCliCommand implements Runnable {
         } else {
             cacheStore = new CacheStore();
         }
-
-        ProxyConfig config = new ProxyConfig(this.port, this.origin, 4, Duration.ofSeconds(10), cacheFile);
-        try {
-            ProxyServer server = new ProxyServer(config, cacheStore);
-            server.start();
-        } catch (IOException e) {
-            System.err.println("Error starting server: " + e.getMessage());
-        }
+        return cacheStore;
     }
 }
