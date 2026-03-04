@@ -1,6 +1,8 @@
 import java.io.*;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -50,6 +52,9 @@ public class CacheStore {
     /**
      * Serializes the current cache contents to a file, creating parent directories if needed.
      *
+     * <p>Writes to a temporary file in the same directory first, then atomically renames it
+     * to the target path to prevent a partially written file if the process is interrupted.
+     *
      * @param file path to write the cache to
      * @throws IOException if the file cannot be written
      */
@@ -58,8 +63,21 @@ public class CacheStore {
         if (parent != null) {
             Files.createDirectories(parent);
         }
-        try (ObjectOutputStream oos = new ObjectOutputStream(new BufferedOutputStream(Files.newOutputStream(file)))) {
-            oos.writeObject(cache);
+        Path tempDir = parent != null ? parent : Path.of(".");
+        Path temp = Files.createTempFile(tempDir, "cache-", ".tmp");
+        try {
+            try (ObjectOutputStream oos = new ObjectOutputStream(new BufferedOutputStream(Files.newOutputStream(temp)))) {
+                oos.writeObject(cache);
+            }
+            try {
+                Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException e) {
+                // Fall back to non-atomic replace if the filesystem does not support atomic moves
+                Files.move(temp, file, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            Files.deleteIfExists(temp);
+            throw e;
         }
     }
 
