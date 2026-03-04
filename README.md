@@ -25,7 +25,7 @@ POST bypasses the cache entirely
 
 ```bash
 git clone https://github.com/ChristianKiernan/caching-proxy-server.git
-cd caching-proxy
+cd caching-proxy-server
 mvn package
 ```
 
