@@ -16,6 +16,19 @@ POST bypasses the cache entirely
 - **Graceful shutdown**: in-flight requests are given up to 5 seconds to complete on SIGTERM
 - **Virtual threads**: each request is handled on its own Java 21 virtual thread
 
+## Requirements
+
+- Java 21+
+- Maven 3.6+
+
+## Build
+
+```bash
+mvn package
+```
+
+This produces a JAR at `target/caching-proxy-1.0-SNAPSHOT.jar`.
+
 ## Usage
 
 ### Start the proxy
@@ -69,6 +82,12 @@ curl -i http://localhost:3000/products/1
 # Second request — served from cache
 curl -i http://localhost:3000/products/1
 # X-Cache: HIT
+```
+
+## Development
+
+```bash
+mvn test
 ```
 
 ## Project structure
