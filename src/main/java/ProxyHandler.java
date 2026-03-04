@@ -25,23 +25,13 @@ public class ProxyHandler implements HttpHandler {
     private final HttpClient client;
 
     /**
-     * Creates a handler with a default {@link HttpClient}.
-     *
-     * @param cacheStore the cache to read from and write to
-     * @param config     proxy configuration (origin URI, cache file path, etc.)
-     */
-    public ProxyHandler(CacheStore cacheStore, ProxyConfig config) {
-        this(cacheStore, config, HttpClient.newHttpClient());
-    }
-
-    /**
-     * Creates a handler with an explicit {@link HttpClient}; intended for testing.
+     * Creates a handler with the given {@link HttpClient}.
      *
      * @param cacheStore the cache to read from and write to
      * @param config     proxy configuration (origin URI, cache file path, etc.)
      * @param client     the HTTP client used to forward requests to the origin
      */
-    ProxyHandler(CacheStore cacheStore, ProxyConfig config, HttpClient client) {
+    public ProxyHandler(CacheStore cacheStore, ProxyConfig config, HttpClient client) {
         this.cacheStore = cacheStore;
         this.config = config;
         this.client = client;
@@ -59,56 +49,61 @@ public class ProxyHandler implements HttpHandler {
      */
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-        // Build cache key from the path and the query string
         URI uri = exchange.getRequestURI();
-        String path = uri.getPath();
-        String query = uri.getQuery();
-        String cacheKey = query != null ? path + "?" + query : path;
+        String cacheKey = buildCacheKey(uri.getPath(), uri.getQuery());
 
         Optional<CachedResponse> cached = cacheStore.get(cacheKey);
         if (cached.isPresent()) {
-            // HIT: return cached response
-            CachedResponse cachedResponse = cached.get();
-            exchange.getResponseHeaders().putAll(cachedResponse.headers());
-            exchange.getResponseHeaders().set("X-Cache", "HIT");
-            exchange.sendResponseHeaders(cachedResponse.statusCode(), cachedResponse.body().length);
-            exchange.getResponseBody().write(cachedResponse.body());
-            exchange.close();
+            writeResponse(exchange, cached.get(), "HIT");
         } else {
-            // MISS: forward to origin, cache result, return to client
-            String relativePath = query != null ? path.substring(1) + "?" + query : path.substring(1);
-            URI targetUri = config.originBaseUri().resolve(relativePath);
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(targetUri)
-                    .method(exchange.getRequestMethod(), HttpRequest.BodyPublishers.noBody())
-                    .build();
-            HttpResponse<byte[]> response;
-            try {
-                response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IOException("Request to origin interrupted", e);
-            }
-
-            // Filter out transfer-encoding, as it can conflict with how we send the response
-            Map<String, List<String>> headers = new java.util.HashMap<>(response.headers().map());
-            headers.remove("transfer-encoding");
-
-            CachedResponse cachedResponse = new CachedResponse(response.statusCode(), headers, response.body());
-            cacheStore.put(cacheKey, cachedResponse);
-            if (config.cacheFilePath() != null) {
-                try {
-                    cacheStore.save(config.cacheFilePath());
-                } catch (IOException e) {
-                    System.err.println("Warning: failed to persist cache: " + e.getMessage());
-                }
-            }
-
-            exchange.getResponseHeaders().putAll(headers);
-            exchange.getResponseHeaders().set("X-Cache", "MISS");
-            exchange.sendResponseHeaders(cachedResponse.statusCode(), cachedResponse.body().length);
-            exchange.getResponseBody().write(cachedResponse.body());
-            exchange.close();
+            CachedResponse fetched = fetchFromOrigin(uri.getPath(), uri.getQuery(), exchange.getRequestMethod());
+            cacheStore.put(cacheKey, fetched);
+            persistIfEnabled();
+            writeResponse(exchange, fetched, "MISS");
         }
+    }
+
+    private String buildCacheKey(String path, String query) {
+        return query != null ? path + "?" + query : path;
+    }
+
+    private CachedResponse fetchFromOrigin(String path, String query, String method) throws IOException {
+        String relativePath = query != null ? path.substring(1) + "?" + query : path.substring(1);
+        URI targetUri = config.originBaseUri().resolve(relativePath);
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(targetUri)
+                .method(method, HttpRequest.BodyPublishers.noBody())
+                .build();
+        HttpResponse<byte[]> response;
+        try {
+            response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Request to origin interrupted", e);
+        }
+
+        // Filter out transfer-encoding, as it can conflict with how we send the response
+        Map<String, List<String>> headers = new java.util.HashMap<>(response.headers().map());
+        headers.remove("transfer-encoding");
+
+        return new CachedResponse(response.statusCode(), headers, response.body());
+    }
+
+    private void persistIfEnabled() {
+        if (config.cacheFilePath() != null) {
+            try {
+                cacheStore.save(config.cacheFilePath());
+            } catch (IOException e) {
+                System.err.println("Warning: failed to persist cache: " + e.getMessage());
+            }
+        }
+    }
+
+    private void writeResponse(HttpExchange exchange, CachedResponse response, String xCacheValue) throws IOException {
+        exchange.getResponseHeaders().putAll(response.headers());
+        exchange.getResponseHeaders().set("X-Cache", xCacheValue);
+        exchange.sendResponseHeaders(response.statusCode(), response.body().length);
+        exchange.getResponseBody().write(response.body());
+        exchange.close();
     }
 }
