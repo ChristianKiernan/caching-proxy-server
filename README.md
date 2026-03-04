@@ -24,17 +24,19 @@ POST bypasses the cache entirely
 ## Build
 
 ```bash
+git clone https://github.com/ChristianKiernan/caching-proxy-server.git
+cd caching-proxy
 mvn package
 ```
 
-This produces a JAR at `target/caching-proxy-1.0-SNAPSHOT.jar`.
+This produces a self-contained JAR at `target/caching-proxy-1.0-SNAPSHOT.jar` with all dependencies bundled.
 
 ## Usage
 
 ### Start the proxy
 
 ```bash
-java -cp target/caching-proxy-1.0-SNAPSHOT.jar com.christiankiernan.cachingproxy.Main \
+java -jar target/caching-proxy-1.0-SNAPSHOT.jar \
   --port 3000 \
   --origin http://dummyjson.com
 ```
@@ -56,7 +58,7 @@ Requests to `http://localhost:3000/products` will be forwarded to `http://dummyj
 ### With cache persistence
 
 ```bash
-java -cp target/caching-proxy-1.0-SNAPSHOT.jar com.christiankiernan.cachingproxy.Main \
+java -jar target/caching-proxy-1.0-SNAPSHOT.jar \
   --port 3000 \
   --origin http://dummyjson.com \
   --cache-file /tmp/proxy-cache.dat
@@ -67,7 +69,7 @@ The cache is loaded from the file on startup and saved after each new entry.
 ### Clear the cache
 
 ```bash
-java -cp target/caching-proxy-1.0-SNAPSHOT.jar com.christiankiernan.cachingproxy.Main \
+java -jar target/caching-proxy-1.0-SNAPSHOT.jar \
   --clear-cache \
   --cache-file /tmp/proxy-cache.dat
 ```
