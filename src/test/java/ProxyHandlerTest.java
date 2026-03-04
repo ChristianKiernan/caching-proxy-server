@@ -8,6 +8,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -19,7 +20,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -153,6 +154,23 @@ class ProxyHandlerTest {
         ArgumentCaptor<HttpRequest> captor = ArgumentCaptor.forClass(HttpRequest.class);
         verify(mockClient).send(captor.capture(), any());
         assertEquals(body.length, captor.getValue().bodyPublisher().get().contentLength());
+    }
+
+    @Test
+    void originFailureReturns502() throws Exception {
+        Headers responseHeaders = new Headers();
+        when(mockExchange.getRequestURI()).thenReturn(URI.create("/products"));
+        when(mockExchange.getRequestMethod()).thenReturn("GET");
+        when(mockExchange.getRequestBody()).thenReturn(InputStream.nullInputStream());
+        when(mockExchange.getRequestHeaders()).thenReturn(new Headers());
+        when(mockExchange.getResponseHeaders()).thenReturn(responseHeaders);
+        when(mockExchange.getResponseBody()).thenReturn(new ByteArrayOutputStream());
+        when(mockClient.send(any(), any())).thenThrow(new IOException("connection refused"));
+
+        new ProxyHandler(new CacheStore(), config, mockClient).handle(mockExchange);
+
+        verify(mockExchange).sendResponseHeaders(eq(502), anyLong());
+        assertEquals("MISS", responseHeaders.getFirst("X-Cache"));
     }
 
     @Test

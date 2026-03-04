@@ -75,4 +75,15 @@ class CacheStoreTest {
         assertEquals(Optional.empty(), store.get("/foo"));
         assertTrue(store.get("/bar").isPresent());
     }
+
+    @Test
+    void putDoesNotExceedMaxSize() {
+        CacheStore store = new CacheStore(2);
+        store.put("/a", new CachedResponse(200, Map.of(), new byte[0]));
+        store.put("/b", new CachedResponse(200, Map.of(), new byte[0]));
+        store.put("/c", new CachedResponse(200, Map.of(), new byte[0])); // should be dropped
+        assertTrue(store.get("/a").isPresent());
+        assertTrue(store.get("/b").isPresent());
+        assertEquals(Optional.empty(), store.get("/c"));
+    }
 }

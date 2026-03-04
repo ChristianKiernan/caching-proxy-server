@@ -6,6 +6,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -83,7 +84,17 @@ public class ProxyHandler implements HttpHandler {
             cacheStore.evict(cacheKey);
         }
 
-        CachedResponse response = fetchFromOrigin(uri.getPath(), uri.getQuery(), method, requestBody, exchange.getRequestHeaders());
+        CachedResponse response;
+        try {
+            response = fetchFromOrigin(uri.getPath(), uri.getQuery(), method, requestBody, exchange.getRequestHeaders());
+        } catch (IOException e) {
+            byte[] body = "502 Bad Gateway".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("X-Cache", "MISS");
+            exchange.sendResponseHeaders(502, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+            return;
+        }
 
         // Only cache GET responses
         if ("GET".equalsIgnoreCase(method)) {

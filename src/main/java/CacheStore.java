@@ -11,22 +11,60 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>Cache keys are the request path (and query string where present). Entries are stored in a
  * {@link ConcurrentHashMap} and can be serialized to / deserialized from a file using Java
- * object serialization.
+ * object serialization. A configurable {@code maxSize} prevents unbounded growth; once the
+ * limit is reached, new entries are silently dropped until space is freed by eviction or clear.
  */
 public class CacheStore {
     private final ConcurrentHashMap<String, CachedResponse> cache;
+    private final int maxSize;
 
-    /** Creates an empty cache. */
+    /** Creates an empty cache with no size limit. */
     public CacheStore() {
-        this.cache = new ConcurrentHashMap<>();
+        this(Integer.MAX_VALUE);
     }
 
-    private CacheStore(ConcurrentHashMap<String, CachedResponse> cache) {
+    /**
+     * Creates an empty cache that holds at most {@code maxSize} entries.
+     *
+     * @param maxSize maximum number of entries to retain; must be positive
+     */
+    public CacheStore(int maxSize) {
+        this.cache = new ConcurrentHashMap<>();
+        this.maxSize = maxSize;
+    }
+
+    private CacheStore(ConcurrentHashMap<String, CachedResponse> cache, int maxSize) {
         this.cache = cache;
+        this.maxSize = maxSize;
     }
 
     /**
      * Loads a {@code CacheStore} from a previously saved file.
+     *
+     * <p>If the file does not exist, an empty cache is returned rather than throwing.
+     *
+     * @param file    path to the serialized cache file
+     * @param maxSize maximum number of entries the loaded cache may hold
+     * @return a {@code CacheStore} populated with the file's contents, or an empty one if the
+     *         file does not exist
+     * @throws IOException if the file exists but cannot be read or is corrupted/incompatible
+     */
+    public static CacheStore loadFrom(Path file, int maxSize) throws IOException {
+        if (!Files.exists(file)) {
+            return new CacheStore(maxSize);
+        }
+        try (ObjectInputStream ois = new ObjectInputStream(new BufferedInputStream(Files.newInputStream(file)))) {
+            // Safe: the file was written by save(), which always serializes a ConcurrentHashMap<String, CachedResponse>
+            @SuppressWarnings("unchecked")
+            ConcurrentHashMap<String, CachedResponse> map = (ConcurrentHashMap<String, CachedResponse>) ois.readObject();
+            return new CacheStore(map, maxSize);
+        } catch (ClassNotFoundException e) {
+            throw new IOException("Cache file is incompatible or corrupted", e);
+        }
+    }
+
+    /**
+     * Loads a {@code CacheStore} from a previously saved file with no size limit.
      *
      * <p>If the file does not exist, an empty cache is returned rather than throwing.
      *
@@ -36,17 +74,7 @@ public class CacheStore {
      * @throws IOException if the file exists but cannot be read or is corrupted/incompatible
      */
     public static CacheStore loadFrom(Path file) throws IOException {
-        if (!Files.exists(file)) {
-            return new CacheStore();
-        }
-        try (ObjectInputStream ois = new ObjectInputStream(new BufferedInputStream(Files.newInputStream(file)))) {
-            // Safe: the file was written by save(), which always serializes a ConcurrentHashMap<String, CachedResponse>
-            @SuppressWarnings("unchecked")
-            ConcurrentHashMap<String, CachedResponse> map = (ConcurrentHashMap<String, CachedResponse>) ois.readObject();
-            return new CacheStore(map);
-        } catch (ClassNotFoundException e) {
-            throw new IOException("Cache file is incompatible or corrupted", e);
-        }
+        return loadFrom(file, Integer.MAX_VALUE);
     }
 
     /**
@@ -92,13 +120,16 @@ public class CacheStore {
     }
 
     /**
-     * Stores a response in the cache under the given key.
+     * Stores a response in the cache under the given key, if the cache has not reached its
+     * maximum size. If the cache is full, the entry is silently dropped.
      *
      * @param key   the cache key (request path, with query string if applicable)
      * @param value the response to cache
      */
     public void put(String key, CachedResponse value) {
-        cache.put(key, value);
+        if (cache.size() < maxSize) {
+            cache.put(key, value);
+        }
     }
 
     /**

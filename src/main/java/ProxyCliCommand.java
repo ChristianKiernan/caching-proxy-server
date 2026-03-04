@@ -39,6 +39,9 @@ public class ProxyCliCommand implements Runnable {
     @Option(names = "--timeout", description = "Origin request timeout in seconds (default: 10).", defaultValue = "10")
     private int timeoutSeconds;
 
+    @Option(names = "--max-cache-size", description = "Maximum number of responses to keep in cache (default: 1000).", defaultValue = "1000")
+    private int maxCacheSize;
+
     /**
      * Executes the command.
      *
@@ -59,6 +62,10 @@ public class ProxyCliCommand implements Runnable {
         }
         if (timeoutSeconds <= 0) {
             System.err.println("Error: --timeout must be a positive integer.");
+            return;
+        }
+        if (maxCacheSize <= 0) {
+            System.err.println("Error: --max-cache-size must be a positive integer.");
             return;
         }
         ProxyConfig config = new ProxyConfig(this.port, this.origin, Duration.ofSeconds(timeoutSeconds), cacheFile);
@@ -92,13 +99,13 @@ public class ProxyCliCommand implements Runnable {
         CacheStore cacheStore;
         if (cacheFile != null) {
             try {
-                cacheStore = CacheStore.loadFrom(cacheFile);
+                cacheStore = CacheStore.loadFrom(cacheFile, maxCacheSize);
             } catch (IOException e) {
                 System.err.println("Warning: could not load cache from file: " + e.getMessage());
-                cacheStore = new CacheStore();
+                cacheStore = new CacheStore(maxCacheSize);
             }
         } else {
-            cacheStore = new CacheStore();
+            cacheStore = new CacheStore(maxCacheSize);
         }
         return cacheStore;
     }
