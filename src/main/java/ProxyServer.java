@@ -11,7 +11,6 @@ import java.util.concurrent.Executors;
  */
 public class ProxyServer {
     private final HttpServer server;
-    private final CacheStore cache;
 
     /**
      * Creates and configures the HTTP server but does not start it.
@@ -22,7 +21,6 @@ public class ProxyServer {
      */
     public ProxyServer(ProxyConfig config, CacheStore cache) throws IOException {
         this.server = HttpServer.create(new InetSocketAddress(config.port()), 0);
-        this.cache = cache;
         server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         server.createContext("/", new ProxyHandler(cache, config, HttpClient.newHttpClient()));
     }
