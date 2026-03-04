@@ -76,8 +76,11 @@ public class ProxyCliCommand implements Runnable {
             ProxyServer server = new ProxyServer(config, loadCacheStore());
             Runtime.getRuntime().addShutdownHook(new Thread(server::stop));
             server.start();
+            Thread.currentThread().join(); // block until the process is terminated
         } catch (IOException e) {
             System.err.println("Error starting server: " + e.getMessage());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 
