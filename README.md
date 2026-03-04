@@ -73,6 +73,8 @@ java -jar target/caching-proxy-1.0-SNAPSHOT.jar \
   --clear-cache \
   --cache-file /tmp/proxy-cache.dat
 ```
+<img width="972" height="82" alt="image" src="https://github.com/user-attachments/assets/34361848-1793-4ff2-9249-3a41199e3cb7" />
+
 
 ### Example request
 
@@ -80,17 +82,15 @@ java -jar target/caching-proxy-1.0-SNAPSHOT.jar \
 # First request — fetched from origin
 curl -i http://localhost:3000/products/1
 # X-Cache: MISS
+```
+<img width="717" height="490" alt="Screenshot 2026-03-04 140217" src="https://github.com/user-attachments/assets/76ea0618-0664-49c8-b98f-3fae07d41cf0" />
 
+```bash
 # Second request — served from cache
 curl -i http://localhost:3000/products/1
 # X-Cache: HIT
 ```
-
-## Development
-
-```bash
-mvn test
-```
+<img width="673" height="481" alt="Screenshot 2026-03-04 140659" src="https://github.com/user-attachments/assets/9b1ae3ec-650c-4605-8ebf-42795cc64f55" />
 
 ## Project structure
 
