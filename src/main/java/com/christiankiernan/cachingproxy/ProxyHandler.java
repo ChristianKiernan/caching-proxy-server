@@ -38,6 +38,12 @@ public class ProxyHandler implements HttpHandler {
             "transfer-encoding", "upgrade"
     );
 
+    // Origin-infrastructure headers that are meaningless or misleading when forwarded to the client.
+    private static final Set<String> ORIGIN_SPECIFIC_HEADERS = Set.of(
+            "cf-cache-status", "cf-ray", "nel", "report-to", "server-timing",
+            "alt-svc", "x-powered-by"
+    );
+
     private final CacheStore cacheStore;
     private final ProxyConfig config;
     private final HttpClient client;
@@ -140,9 +146,10 @@ public class ProxyHandler implements HttpHandler {
             throw new IOException("Request to origin interrupted", e);
         }
 
-        // Filter out transfer-encoding, as it can conflict with how we send the response
+        // Filter out transfer-encoding and origin-specific headers before forwarding to the client
         Map<String, List<String>> headers = new java.util.HashMap<>(response.headers().map());
-        headers.remove("transfer-encoding");
+        headers.keySet().removeIf(k -> k.equalsIgnoreCase("transfer-encoding")
+                || ORIGIN_SPECIFIC_HEADERS.contains(k.toLowerCase()));
 
         return new CachedResponse(response.statusCode(), headers, response.body());
     }
