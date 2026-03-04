@@ -9,16 +9,29 @@ import java.net.http.HttpResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * {@link HttpHandler} that serves requests from cache when possible, and forwards cache misses
  * to the configured origin server.
  *
  * <p>Every response is tagged with an {@code X-Cache} header: {@code HIT} when served from
- * cache, {@code MISS} when fetched from the origin. Cache misses are stored in the
- * {@link CacheStore} and, if a cache file path is configured, persisted to disk immediately.
+ * cache, {@code MISS} when fetched from the origin. Caching is method-aware:
+ * <ul>
+ *   <li>GET responses are cached; subsequent identical requests are served as HITs.</li>
+ *   <li>PUT, DELETE, and PATCH requests evict the cached entry for the target URL.</li>
+ *   <li>POST and other methods are forwarded without reading or writing the cache.</li>
+ * </ul>
  */
 public class ProxyHandler implements HttpHandler {
+
+    // Headers that are specific to the client-to-proxy connection and must not be forwarded upstream.
+    // Also includes headers that java.net.http.HttpRequest restricts from being set.
+    private static final Set<String> HOP_BY_HOP_HEADERS = Set.of(
+            "connection", "content-length", "expect", "host", "keep-alive",
+            "proxy-authenticate", "proxy-authorization", "te", "trailers",
+            "transfer-encoding", "upgrade"
+    );
 
     private final CacheStore cacheStore;
     private final ProxyConfig config;
@@ -40,9 +53,10 @@ public class ProxyHandler implements HttpHandler {
     /**
      * Handles an incoming HTTP request.
      *
-     * <p>Checks the cache for the request's path (plus query string). On a HIT the cached
-     * response is returned directly. On a MISS the request is forwarded to the origin, the
-     * response is cached (and optionally persisted), and then returned to the client.
+     * <p>For GET requests, checks the cache first and returns a HIT immediately if found.
+     * Otherwise, forwards the request to the origin and caches the response. For PUT, DELETE,
+     * and PATCH requests, evicts any cached entry for the URL before forwarding. POST and
+     * other methods are forwarded without interacting with the cache.
      *
      * @param exchange the HTTP exchange representing the incoming request and outgoing response
      * @throws IOException if reading the request or writing the response fails
@@ -50,34 +64,62 @@ public class ProxyHandler implements HttpHandler {
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         URI uri = exchange.getRequestURI();
+        String method = exchange.getRequestMethod();
         String cacheKey = buildCacheKey(uri.getPath(), uri.getQuery());
 
-        Optional<CachedResponse> cached = cacheStore.get(cacheKey);
-        if (cached.isPresent()) {
-            writeResponse(exchange, cached.get(), "HIT");
-        } else {
-            CachedResponse fetched = fetchFromOrigin(uri.getPath(), uri.getQuery(), exchange.getRequestMethod());
-            cacheStore.put(cacheKey, fetched);
-            persistIfEnabled();
-            writeResponse(exchange, fetched, "MISS");
+        // Serve GET hits from cache before reading the (typically empty) request body
+        if ("GET".equalsIgnoreCase(method)) {
+            Optional<CachedResponse> cached = cacheStore.get(cacheKey);
+            if (cached.isPresent()) {
+                writeResponse(exchange, cached.get(), "HIT");
+                return;
+            }
         }
+
+        byte[] requestBody = exchange.getRequestBody().readAllBytes();
+
+        // Mutating methods invalidate any cached entry for this URL
+        if ("PUT".equalsIgnoreCase(method) || "DELETE".equalsIgnoreCase(method) || "PATCH".equalsIgnoreCase(method)) {
+            cacheStore.evict(cacheKey);
+        }
+
+        CachedResponse response = fetchFromOrigin(uri.getPath(), uri.getQuery(), method, requestBody, exchange.getRequestHeaders());
+
+        // Only cache GET responses
+        if ("GET".equalsIgnoreCase(method)) {
+            cacheStore.put(cacheKey, response);
+            persistIfEnabled();
+        }
+
+        writeResponse(exchange, response, "MISS");
     }
 
     private String buildCacheKey(String path, String query) {
         return query != null ? path + "?" + query : path;
     }
 
-    private CachedResponse fetchFromOrigin(String path, String query, String method) throws IOException {
+    private CachedResponse fetchFromOrigin(String path, String query, String method,
+                                           byte[] requestBody, Map<String, List<String>> requestHeaders) throws IOException {
         String relativePath = query != null ? path.substring(1) + "?" + query : path.substring(1);
         URI targetUri = config.originBaseUri().resolve(relativePath);
-        HttpRequest request = HttpRequest.newBuilder()
+
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
                 .uri(targetUri)
                 .timeout(config.originTimeOut())
-                .method(method, HttpRequest.BodyPublishers.noBody())
-                .build();
+                .method(method, requestBody.length > 0
+                        ? HttpRequest.BodyPublishers.ofByteArray(requestBody)
+                        : HttpRequest.BodyPublishers.noBody());
+
+        // Forward request headers, skipping hop-by-hop and connection-specific headers
+        requestHeaders.forEach((name, values) -> {
+            if (!HOP_BY_HOP_HEADERS.contains(name.toLowerCase())) {
+                values.forEach(value -> builder.header(name, value));
+            }
+        });
+
         HttpResponse<byte[]> response;
         try {
-            response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            response = client.send(builder.build(), HttpResponse.BodyHandlers.ofByteArray());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException("Request to origin interrupted", e);

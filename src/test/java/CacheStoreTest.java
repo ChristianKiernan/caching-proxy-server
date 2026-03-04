@@ -65,4 +65,14 @@ class CacheStoreTest {
         Files.writeString(file, "not valid serialized data");
         assertThrows(IOException.class, () -> CacheStore.loadFrom(file));
     }
+
+    @Test
+    void evictRemovesSingleEntry() {
+        CacheStore store = new CacheStore();
+        store.put("/foo", new CachedResponse(200, Map.of(), new byte[0]));
+        store.put("/bar", new CachedResponse(200, Map.of(), new byte[0]));
+        store.evict("/foo");
+        assertEquals(Optional.empty(), store.get("/foo"));
+        assertTrue(store.get("/bar").isPresent());
+    }
 }

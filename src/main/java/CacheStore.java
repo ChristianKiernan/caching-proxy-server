@@ -83,6 +83,15 @@ public class CacheStore {
         cache.put(key, value);
     }
 
+    /**
+     * Removes the entry for the given key, if present.
+     *
+     * @param key the cache key to evict
+     */
+    public void evict(String key) {
+        cache.remove(key);
+    }
+
     /** Removes all entries from the cache. */
     public void clear() {
         cache.clear();
