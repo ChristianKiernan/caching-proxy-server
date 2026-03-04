@@ -3,6 +3,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.http.HttpClient;
+import java.util.concurrent.Executors;
 
 /**
  * Thin wrapper around {@link HttpServer} that wires together the proxy's request handler and
@@ -22,6 +23,7 @@ public class ProxyServer {
     public ProxyServer(ProxyConfig config, CacheStore cache) throws IOException {
         this.server = HttpServer.create(new InetSocketAddress(config.port()), 0);
         this.cache = cache;
+        server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         server.createContext("/", new ProxyHandler(cache, config, HttpClient.newHttpClient()));
     }
 

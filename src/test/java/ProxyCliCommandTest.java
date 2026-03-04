@@ -56,4 +56,10 @@ class ProxyCliCommandTest {
         assertFalse(Files.exists(cacheFile));
         assertTrue(outContent.toString().contains("Cache cleared"));
     }
+
+    @Test
+    void invalidTimeoutPrintsError() {
+        new CommandLine(new ProxyCliCommand()).execute("--port", "3000", "--origin", "http://example.com", "--timeout", "0");
+        assertTrue(errContent.toString().contains("--timeout must be a positive integer"));
+    }
 }

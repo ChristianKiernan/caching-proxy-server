@@ -26,7 +26,7 @@ class ProxyHandlerTest {
     @Mock HttpResponse<byte[]> mockResponse;
 
     private ProxyConfig config = new ProxyConfig(
-            3000, URI.create("http://origin.test"), 4, Duration.ofSeconds(10), null
+            3000, URI.create("http://origin.test"), Duration.ofSeconds(10), null
     );
 
     @Test

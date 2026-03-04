@@ -36,6 +36,9 @@ public class ProxyCliCommand implements Runnable {
     @Option(names = "--clear-cache", description = "Clear the cache and exit.")
     private boolean clearCache;
 
+    @Option(names = "--timeout", description = "Origin request timeout in seconds (default: 10).", defaultValue = "10")
+    private int timeoutSeconds;
+
     /**
      * Executes the command.
      *
@@ -54,7 +57,11 @@ public class ProxyCliCommand implements Runnable {
             System.err.println("Try: caching-proxy --help");
             return;
         }
-        ProxyConfig config = new ProxyConfig(this.port, this.origin, 4, Duration.ofSeconds(10), cacheFile);
+        if (timeoutSeconds <= 0) {
+            System.err.println("Error: --timeout must be a positive integer.");
+            return;
+        }
+        ProxyConfig config = new ProxyConfig(this.port, this.origin, Duration.ofSeconds(timeoutSeconds), cacheFile);
         try {
             ProxyServer server = new ProxyServer(config, loadCacheStore());
             server.start();

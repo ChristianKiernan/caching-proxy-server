@@ -72,6 +72,7 @@ public class ProxyHandler implements HttpHandler {
         URI targetUri = config.originBaseUri().resolve(relativePath);
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(targetUri)
+                .timeout(config.originTimeOut())
                 .method(method, HttpRequest.BodyPublishers.noBody())
                 .build();
         HttpResponse<byte[]> response;
