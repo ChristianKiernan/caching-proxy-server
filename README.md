@@ -118,3 +118,7 @@ src/
 - Uses `java.net.http.HttpClient` for upstream requests
 - Cache is a `ConcurrentHashMap`, which is safe for concurrent access across virtual threads
 - Cache persistence uses Java object serialization with atomic file writes (temporary file + rename)
+
+## Additional
+
+This project was implemented as a solution to the Caching Proxy project from https://roadmap.sh/projects/caching-server.
