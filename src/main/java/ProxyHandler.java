@@ -10,17 +10,53 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * {@link HttpHandler} that serves requests from cache when possible, and forwards cache misses
+ * to the configured origin server.
+ *
+ * <p>Every response is tagged with an {@code X-Cache} header: {@code HIT} when served from
+ * cache, {@code MISS} when fetched from the origin. Cache misses are stored in the
+ * {@link CacheStore} and, if a cache file path is configured, persisted to disk immediately.
+ */
 public class ProxyHandler implements HttpHandler {
 
     private final CacheStore cacheStore;
     private final ProxyConfig config;
-    private final HttpClient client = HttpClient.newHttpClient();
+    private final HttpClient client;
 
+    /**
+     * Creates a handler with a default {@link HttpClient}.
+     *
+     * @param cacheStore the cache to read from and write to
+     * @param config     proxy configuration (origin URI, cache file path, etc.)
+     */
     public ProxyHandler(CacheStore cacheStore, ProxyConfig config) {
-        this.cacheStore = cacheStore;
-        this.config = config;
+        this(cacheStore, config, HttpClient.newHttpClient());
     }
 
+    /**
+     * Creates a handler with an explicit {@link HttpClient}; intended for testing.
+     *
+     * @param cacheStore the cache to read from and write to
+     * @param config     proxy configuration (origin URI, cache file path, etc.)
+     * @param client     the HTTP client used to forward requests to the origin
+     */
+    ProxyHandler(CacheStore cacheStore, ProxyConfig config, HttpClient client) {
+        this.cacheStore = cacheStore;
+        this.config = config;
+        this.client = client;
+    }
+
+    /**
+     * Handles an incoming HTTP request.
+     *
+     * <p>Checks the cache for the request's path (plus query string). On a HIT the cached
+     * response is returned directly. On a MISS the request is forwarded to the origin, the
+     * response is cached (and optionally persisted), and then returned to the client.
+     *
+     * @param exchange the HTTP exchange representing the incoming request and outgoing response
+     * @throws IOException if reading the request or writing the response fails
+     */
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         // Build cache key from the path and the query string
@@ -40,7 +76,8 @@ public class ProxyHandler implements HttpHandler {
             exchange.close();
         } else {
             // MISS: forward to origin, cache result, return to client
-            URI targetUri = config.originBaseUri().resolve(path.substring(1));
+            String relativePath = query != null ? path.substring(1) + "?" + query : path.substring(1);
+            URI targetUri = config.originBaseUri().resolve(relativePath);
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(targetUri)
                     .method(exchange.getRequestMethod(), HttpRequest.BodyPublishers.noBody())
@@ -59,6 +96,13 @@ public class ProxyHandler implements HttpHandler {
 
             CachedResponse cachedResponse = new CachedResponse(response.statusCode(), headers, response.body());
             cacheStore.put(cacheKey, cachedResponse);
+            if (config.cacheFilePath() != null) {
+                try {
+                    cacheStore.save(config.cacheFilePath());
+                } catch (IOException e) {
+                    System.err.println("Warning: failed to persist cache: " + e.getMessage());
+                }
+            }
 
             exchange.getResponseHeaders().putAll(headers);
             exchange.getResponseHeaders().set("X-Cache", "MISS");
