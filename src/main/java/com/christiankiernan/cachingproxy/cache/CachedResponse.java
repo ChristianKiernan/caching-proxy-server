@@ -1,3 +1,5 @@
+package com.christiankiernan.cachingproxy.cache;
+
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.List;

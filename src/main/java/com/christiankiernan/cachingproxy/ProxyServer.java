@@ -1,3 +1,6 @@
+package com.christiankiernan.cachingproxy;
+
+import com.christiankiernan.cachingproxy.cache.CacheStore;
 import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;

@@ -1,3 +1,6 @@
+package com.christiankiernan.cachingproxy;
+
+import com.christiankiernan.cachingproxy.cache.CacheStore;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 

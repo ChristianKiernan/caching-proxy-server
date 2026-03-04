@@ -1,3 +1,7 @@
+package com.christiankiernan.cachingproxy;
+
+import com.christiankiernan.cachingproxy.cache.CachedResponse;
+import com.christiankiernan.cachingproxy.cache.CacheStore;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 

@@ -1,3 +1,5 @@
+package com.christiankiernan.cachingproxy;
+
 import picocli.CommandLine;
 
 /**

@@ -1,3 +1,5 @@
+package com.christiankiernan.cachingproxy.cache;
+
 import java.io.*;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;

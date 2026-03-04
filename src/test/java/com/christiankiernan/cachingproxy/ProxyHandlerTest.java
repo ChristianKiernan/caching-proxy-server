@@ -1,3 +1,7 @@
+package com.christiankiernan.cachingproxy;
+
+import com.christiankiernan.cachingproxy.cache.CachedResponse;
+import com.christiankiernan.cachingproxy.cache.CacheStore;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import org.junit.jupiter.api.Test;
@@ -136,6 +140,23 @@ class ProxyHandlerTest {
     }
 
     @Test
+    void originFailureReturns502() throws Exception {
+        Headers responseHeaders = new Headers();
+        when(mockExchange.getRequestURI()).thenReturn(URI.create("/products"));
+        when(mockExchange.getRequestMethod()).thenReturn("GET");
+        when(mockExchange.getRequestBody()).thenReturn(InputStream.nullInputStream());
+        when(mockExchange.getRequestHeaders()).thenReturn(new Headers());
+        when(mockExchange.getResponseHeaders()).thenReturn(responseHeaders);
+        when(mockExchange.getResponseBody()).thenReturn(new ByteArrayOutputStream());
+        when(mockClient.send(any(), any())).thenThrow(new IOException("connection refused"));
+
+        new ProxyHandler(new CacheStore(), config, mockClient).handle(mockExchange);
+
+        verify(mockExchange).sendResponseHeaders(eq(502), anyLong());
+        assertEquals("MISS", responseHeaders.getFirst("X-Cache"));
+    }
+
+    @Test
     void requestBodyIsForwardedToOrigin() throws Exception {
         byte[] body = "{\"name\":\"test\"}".getBytes();
         when(mockExchange.getRequestURI()).thenReturn(URI.create("/products"));
@@ -154,23 +175,6 @@ class ProxyHandlerTest {
         ArgumentCaptor<HttpRequest> captor = ArgumentCaptor.forClass(HttpRequest.class);
         verify(mockClient).send(captor.capture(), any());
         assertEquals(body.length, captor.getValue().bodyPublisher().get().contentLength());
-    }
-
-    @Test
-    void originFailureReturns502() throws Exception {
-        Headers responseHeaders = new Headers();
-        when(mockExchange.getRequestURI()).thenReturn(URI.create("/products"));
-        when(mockExchange.getRequestMethod()).thenReturn("GET");
-        when(mockExchange.getRequestBody()).thenReturn(InputStream.nullInputStream());
-        when(mockExchange.getRequestHeaders()).thenReturn(new Headers());
-        when(mockExchange.getResponseHeaders()).thenReturn(responseHeaders);
-        when(mockExchange.getResponseBody()).thenReturn(new ByteArrayOutputStream());
-        when(mockClient.send(any(), any())).thenThrow(new IOException("connection refused"));
-
-        new ProxyHandler(new CacheStore(), config, mockClient).handle(mockExchange);
-
-        verify(mockExchange).sendResponseHeaders(eq(502), anyLong());
-        assertEquals("MISS", responseHeaders.getFirst("X-Cache"));
     }
 
     @Test
