@@ -43,6 +43,8 @@ java -jar target/caching-proxy-1.0-SNAPSHOT.jar \
 
 Requests to `http://localhost:3000/products` will be forwarded to `https://dummyjson.com/products`.
 
+<img width="972" height="82" alt="image" src="https://github.com/user-attachments/assets/34361848-1793-4ff2-9249-3a41199e3cb7" />
+
 ### All options
 
 | Option | Description | Default |
@@ -73,8 +75,6 @@ java -jar target/caching-proxy-1.0-SNAPSHOT.jar \
   --clear-cache \
   --cache-file /tmp/proxy-cache.dat
 ```
-<img width="972" height="82" alt="image" src="https://github.com/user-attachments/assets/34361848-1793-4ff2-9249-3a41199e3cb7" />
-
 
 ### Example request
 
