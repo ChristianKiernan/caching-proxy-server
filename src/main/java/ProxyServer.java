@@ -7,7 +7,7 @@ import java.util.concurrent.Executors;
 
 /**
  * Thin wrapper around {@link HttpServer} that wires together the proxy's request handler and
- * exposes a simple {@link #start()} lifecycle method.
+ * exposes a simple {@link #start()}/{@link #stop()} lifecycle.
  */
 public class ProxyServer {
     private final HttpServer server;
@@ -31,5 +31,14 @@ public class ProxyServer {
     public void start() {
         server.start();
         System.out.println("Proxy server listening on port " + server.getAddress().getPort());
+    }
+
+    /**
+     * Stops the server, allowing up to 5 seconds for in-flight requests to complete.
+     */
+    public void stop() {
+        System.out.println("Shutting down proxy server...");
+        server.stop(5);
+        System.out.println("Proxy server stopped.");
     }
 }

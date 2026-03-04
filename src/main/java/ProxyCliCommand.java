@@ -64,6 +64,7 @@ public class ProxyCliCommand implements Runnable {
         ProxyConfig config = new ProxyConfig(this.port, this.origin, Duration.ofSeconds(timeoutSeconds), cacheFile);
         try {
             ProxyServer server = new ProxyServer(config, loadCacheStore());
+            Runtime.getRuntime().addShutdownHook(new Thread(server::stop));
             server.start();
         } catch (IOException e) {
             System.err.println("Error starting server: " + e.getMessage());
