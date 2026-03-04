@@ -38,10 +38,10 @@ This produces a self-contained JAR at `target/caching-proxy-1.0-SNAPSHOT.jar` wi
 ```bash
 java -jar target/caching-proxy-1.0-SNAPSHOT.jar \
   --port 3000 \
-  --origin http://dummyjson.com
+  --origin https://dummyjson.com
 ```
 
-Requests to `http://localhost:3000/products` will be forwarded to `http://dummyjson.com/products`.
+Requests to `http://localhost:3000/products` will be forwarded to `https://dummyjson.com/products`.
 
 ### All options
 
@@ -60,7 +60,7 @@ Requests to `http://localhost:3000/products` will be forwarded to `http://dummyj
 ```bash
 java -jar target/caching-proxy-1.0-SNAPSHOT.jar \
   --port 3000 \
-  --origin http://dummyjson.com \
+  --origin https://dummyjson.com \
   --cache-file /tmp/proxy-cache.dat
 ```
 
