@@ -43,8 +43,6 @@ java -jar target/caching-proxy-1.0-SNAPSHOT.jar \
 
 Requests to `http://localhost:3000/products` will be forwarded to `https://dummyjson.com/products`.
 
-<img width="972" height="82" alt="image" src="https://github.com/user-attachments/assets/34361848-1793-4ff2-9249-3a41199e3cb7" />
-
 ### All options
 
 | Option | Description | Default |
@@ -83,14 +81,12 @@ java -jar target/caching-proxy-1.0-SNAPSHOT.jar \
 curl -i http://localhost:3000/products/1
 # X-Cache: MISS
 ```
-<img width="717" height="490" alt="Screenshot 2026-03-04 140217" src="https://github.com/user-attachments/assets/76ea0618-0664-49c8-b98f-3fae07d41cf0" />
 
 ```bash
 # Second request — served from cache
 curl -i http://localhost:3000/products/1
 # X-Cache: HIT
 ```
-<img width="673" height="481" alt="Screenshot 2026-03-04 140659" src="https://github.com/user-attachments/assets/9b1ae3ec-650c-4605-8ebf-42795cc64f55" />
 
 ## Project structure
 
